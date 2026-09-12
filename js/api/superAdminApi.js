@@ -114,3 +114,44 @@ async function restoreBackup(backupId, confirmationPhrase) {
 async function fetchIntegrations() {
     return await apiClient.get('/super-admin/integrations');
 }
+
+// ─── Academic Institutions: Universities ──────────────────────────────────────
+// NOTE: spec defines these under /admin/... (not /super-admin/...) — confirm with backend.
+
+async function createUniversity(nameAr, nameEn, country) {
+    return await apiClient.post('/admin/universities', { nameAr, nameEn, country });
+}
+
+async function fetchUniversities() {
+    return await apiClient.get('/admin/universities');
+}
+
+// ─── Academic Institutions: Faculties ──────────────────────────────────────────
+
+async function createFaculty(universityId, nameAr, nameEn, code, isActive = true) {
+    return await apiClient.post('/admin/faculties', { universityId, nameAr, nameEn, code, isActive });
+}
+
+async function fetchFaculties(universityId = '') {
+    const query = universityId ? `?universityId=${encodeURIComponent(universityId)}` : '';
+    return await apiClient.get(`/admin/faculties${query}`);
+}
+
+// ─── Faculty Deans ──────────────────────────────────────────────────────────────
+
+async function createDean(payload) {
+    // payload: { name, email, password, academicTitle, facultyId, phone, office, appointmentDate }
+    return await apiClient.post('/admin/deans', payload);
+}
+
+async function fetchDeans() {
+    return await apiClient.get('/admin/deans');
+}
+
+async function updateDeanStatus(id, isActive, reason = '') {
+    return await apiClient.put(`/admin/deans/${id}/status`, { isActive, reason });
+}
+
+async function resetDeanPassword(id, newPassword) {
+    return await apiClient.post(`/admin/deans/${id}/reset-password`, { newPassword });
+}
