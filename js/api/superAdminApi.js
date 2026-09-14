@@ -119,7 +119,8 @@ async function fetchIntegrations() {
 // NOTE: spec defines these under /admin/... (not /super-admin/...) — confirm with backend.
 
 async function createUniversity(nameAr, nameEn, country) {
-    return await apiClient.post('/admin/universities', { nameAr, nameEn, country });
+    // Backend model uses ArabicName/EnglishName, not the nameAr/nameEn shown in the spec doc.
+    return await apiClient.post('/admin/universities', { arabicName: nameAr, englishName: nameEn, country });
 }
 
 async function fetchUniversities() {
@@ -129,7 +130,8 @@ async function fetchUniversities() {
 // ─── Academic Institutions: Faculties ──────────────────────────────────────────
 
 async function createFaculty(universityId, nameAr, nameEn, code, isActive = true) {
-    return await apiClient.post('/admin/faculties', { universityId, nameAr, nameEn, code, isActive });
+    // Same ArabicName/EnglishName naming as universities — see createUniversity().
+    return await apiClient.post('/admin/faculties', { universityId, arabicName: nameAr, englishName: nameEn, code, isActive });
 }
 
 async function fetchFaculties(universityId = '') {

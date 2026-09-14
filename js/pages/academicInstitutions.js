@@ -1,3 +1,8 @@
+// Backend model field is arabicName/englishName, not the nameAr/nameEn shown in the spec doc —
+// these fallbacks keep rendering safe until the exact response shape is confirmed.
+function arName(o) { return o.arabicName || o.nameAr || ''; }
+function enName(o) { return o.englishName || o.nameEn || ''; }
+
 let universitiesCache = [];
 let facultiesCache = [];
 let deansCache = [];
@@ -48,8 +53,8 @@ async function loadUniversities() {
 function buildUniversityRow(u) {
     return `
     <tr>
-        <td style="font-weight:600;">${u.nameAr || '—'}</td>
-        <td>${u.nameEn || '—'}</td>
+        <td style="font-weight:600;">${arName(u) || '—'}</td>
+        <td>${enName(u) || '—'}</td>
         <td>${u.country || '—'}</td>
         <td>${u.facultiesCount ?? 0}</td>
     </tr>`;
@@ -63,7 +68,7 @@ function populateUniversityDropdown() {
         return;
     }
     select.innerHTML = universitiesCache
-        .map(u => `<option value="${u.id}">${u.nameAr} (${u.nameEn})</option>`)
+        .map(u => `<option value="${u.id}">${arName(u)} (${enName(u)})</option>`)
         .join('');
 }
 
@@ -117,15 +122,15 @@ async function loadFaculties() {
 
 function resolveUniversityName(universityId) {
     const u = universitiesCache.find(x => x.id === universityId);
-    return u ? `${u.nameAr} (${u.nameEn})` : '—';
+    return u ? `${arName(u)} (${enName(u)})` : '—';
 }
 
 function buildFacultyRow(f) {
     const statusCls = f.isActive ? 'success' : 'danger';
     return `
     <tr>
-        <td style="font-weight:600;">${f.nameAr || '—'}</td>
-        <td>${f.nameEn || '—'}</td>
+        <td style="font-weight:600;">${arName(f) || '—'}</td>
+        <td>${enName(f) || '—'}</td>
         <td>${f.code || '—'}</td>
         <td>${resolveUniversityName(f.universityId)}</td>
         <td><span class="status-badge ${statusCls}">${f.isActive ? 'Active' : 'Inactive'}</span></td>
@@ -148,7 +153,7 @@ function populateFacultyDropdown() {
     });
     select.innerHTML = Object.entries(byUniversity).map(([universityId, faculties]) => {
         const label = resolveUniversityName(universityId);
-        const options = faculties.map(f => `<option value="${f.id}">${f.nameAr} — ${f.code}</option>`).join('');
+        const options = faculties.map(f => `<option value="${f.id}">${arName(f)} — ${f.code}</option>`).join('');
         return `<optgroup label="${label}">${options}</optgroup>`;
     }).join('');
 }
