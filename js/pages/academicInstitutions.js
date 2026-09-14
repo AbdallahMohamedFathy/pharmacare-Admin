@@ -206,7 +206,7 @@ function buildDeanRow(d) {
     const initials = (d.name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     const statusCls = d.isActive ? 'success' : 'danger';
     const apptDate = d.appointmentDate ? new Date(d.appointmentDate).toLocaleDateString() : '—';
-    const idJs = JSON.stringify(d.deanId);
+    const idJs = JSON.stringify(d.id || d.deanId);
     const nameJs = JSON.stringify(d.name || '');
 
     return `
@@ -244,8 +244,10 @@ function openDeanModal() {
     ['dean-name', 'dean-email', 'dean-password', 'dean-academicTitle', 'dean-phone', 'dean-office', 'dean-appointmentDate']
         .forEach(id => { document.getElementById(id).value = ''; });
     document.getElementById('dean-duplicate-warning').style.display = 'none';
+    document.getElementById('dean-submit-btn').disabled = false;
     populateFacultyDropdown();
     document.getElementById('dean-modal').classList.add('active');
+    checkDuplicateDean();
     setTimeout(() => document.getElementById('dean-name').focus(), 200);
 }
 
@@ -253,16 +255,27 @@ function closeDeanModal() {
     document.getElementById('dean-modal').classList.remove('active');
 }
 
+// Backend rejects with 409 if the faculty already has an active Dean (no auto-archive) —
+// so this is a hard block, not just a heads-up.
+function findActiveDeanForFaculty(facultyId) {
+    return deansCache.find(d => d.isActive && d.facultyId === facultyId);
+}
+
 function checkDuplicateDean() {
     const facultyId = document.getElementById('dean-facultyId').value;
     const warning = document.getElementById('dean-duplicate-warning');
-    const faculty = facultiesCache.find(f => f.id === facultyId);
-    if (!faculty) { warning.style.display = 'none'; return; }
+    const submitBtn = document.getElementById('dean-submit-btn');
 
-    const hasActiveDean = deansCache.some(d =>
-        d.isActive && (d.facultyName === faculty.nameAr || d.facultyName === faculty.nameEn)
-    );
-    warning.style.display = hasActiveDean ? 'flex' : 'none';
+    const activeDean = findActiveDeanForFaculty(facultyId);
+    if (activeDean) {
+        document.getElementById('dean-duplicate-warning-text').textContent =
+            `This faculty already has an active Dean (${activeDean.name}). Deactivate them first from the table below — the backend rejects this request otherwise.`;
+        warning.style.display = 'flex';
+        submitBtn.disabled = true;
+    } else {
+        warning.style.display = 'none';
+        submitBtn.disabled = false;
+    }
 }
 
 async function doCreateDean() {
@@ -282,17 +295,50 @@ async function doCreateDean() {
         return;
     }
 
+    // Defense in depth: re-check even though the dropdown's onchange + submit-button
+    // disabling should already have blocked this.
+    if (findActiveDeanForFaculty(payload.facultyId)) {
+        Swal.fire('Faculty Already Has a Dean', 'Deactivate the current Dean for this faculty before provisioning a new one.', 'warning');
+        return;
+    }
+
     const btn = document.getElementById('dean-submit-btn');
     btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Provisioning...';
     btn.disabled = true;
 
     try {
         const res = await createDean(payload);
+        const data = res?.data || res;
         closeDeanModal();
-        showToast('success', res.message || `Dean account created for ${payload.email}.`);
+
+        if (data.generatedPassword) {
+            await Swal.fire({
+                title: 'Dean Account Created',
+                html: `<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Share these credentials with <strong>${payload.name}</strong>:</p>
+                       <div style="background:#f1f5f9;border-radius:8px;padding:12px;text-align:left;">
+                           <div style="font-size:11px;color:#64748b;text-transform:uppercase;">Email</div>
+                           <div style="font-weight:600;margin-bottom:8px;">${payload.email}</div>
+                           <div style="font-size:11px;color:#64748b;text-transform:uppercase;">Password</div>
+                           <div style="font-family:monospace;font-weight:700;">${data.generatedPassword}</div>
+                       </div>`,
+                icon: 'success',
+                confirmButtonText: 'Copy & Close',
+                showCancelButton: true,
+                cancelButtonText: 'Close',
+            }).then(r => {
+                if (r.isConfirmed) navigator.clipboard.writeText(`Email: ${payload.email}\nPassword: ${data.generatedPassword}`).catch(() => {});
+            });
+        } else {
+            showToast('success', res.message || `Dean account created for ${payload.email}.`);
+        }
         await loadDeans();
     } catch (err) {
-        Swal.fire('Failed', err.message, 'error');
+        const msg = err.message || '';
+        if (err.status === 409 || msg.includes('409') || msg.toLowerCase().includes('active dean')) {
+            Swal.fire('Faculty Already Has an Active Dean', 'Deactivate the current Dean for this faculty first, then try again.', 'warning');
+        } else {
+            Swal.fire('Failed', msg, 'error');
+        }
     } finally {
         btn.innerHTML = '<i class="bx bx-user-check"></i> Provision Dean';
         btn.disabled = false;

@@ -64,7 +64,12 @@ const apiClient = {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const msg = errorData.message || errorData.error || `API Error: ${response.status}`;
+            let msg = errorData.message || errorData.error;
+            if (!msg && errorData.errors && typeof errorData.errors === 'object') {
+                // ASP.NET Core ValidationProblemDetails shape: { title, errors: { Field: ["msg1", ...] } }
+                msg = Object.values(errorData.errors).flat().join(' ');
+            }
+            if (!msg) msg = errorData.title || `API Error: ${response.status}`;
             const error = new Error(msg);
             error.status = response.status;
             error.data = errorData;
