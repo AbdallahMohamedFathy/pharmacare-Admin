@@ -338,12 +338,10 @@ async function doCreateDean() {
         }
         await loadDeans();
     } catch (err) {
-        const msg = err.message || '';
-        if (err.status === 409 || msg.includes('409') || msg.toLowerCase().includes('active dean')) {
-            Swal.fire('Faculty Already Has an Active Dean', 'Deactivate the current Dean for this faculty first, then try again.', 'warning');
-        } else {
-            Swal.fire('Failed', msg, 'error');
-        }
+        // Always show the backend's real message — a 409 here can mean "duplicate email"
+        // just as easily as "faculty already has a Dean", and guessing from status code
+        // alone hides the actual reason.
+        Swal.fire('Failed', err.message || 'Something went wrong.', 'error');
     } finally {
         btn.innerHTML = '<i class="bx bx-user-check"></i> Provision Dean';
         btn.disabled = false;
